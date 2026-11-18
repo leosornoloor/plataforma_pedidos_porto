@@ -1,5 +1,6 @@
 import express, {Request, Response} from "express";
 import {randomUUID} from "node:crypto";
+import {medirLatencia, resumenMetricas} from "./metricas";
 
 const PORT = Number (process.env.PORT ?? 3000);
 const INVENTARIO_URL = process.env.INVENTARIO_URL ?? "http://localhost:3001";
@@ -14,6 +15,7 @@ interface Pedidos{
 const pedidos: Pedidos[] = [];
 const app = express();
 app.use(express.json());
+app.use(medirLatencia);
 
 app.get("/health", (_req: Request, res: Response) => {
     res.json({status: "ok", servicio: "pedidos"});
@@ -65,6 +67,22 @@ app.get("/health/ready", async (_req: Request, res: Response) => {
             ms
         });
     }
+});
+app.get("/metricas", (_req: Request, res: Response) => {
+    res.json(resumenMetricas());
+});
+
+app.get("/reporte/bloqueante", (_req: Request, res: Response) => {
+    const hasta = performance.now() + 5000;
+
+    while (performance.now() < hasta) {
+        // Simula un cálculo pesado que bloquea el event loop.
+    }
+
+    res.json({
+        status: "completado",
+        tipo: "bloqueante"
+    });
 });
 
 app.get("/pedidos", (_req: Request, res: Response) => {
