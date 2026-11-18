@@ -1,4 +1,6 @@
 import {Request, Response, NextFunction} from "express";
+import {availableParallelism} from "node:os";
+import {monitorEventLoopDelay} from "node:perf_hooks";
 
 const UMBRAL_LENTA_MS = Number(
     process.env.UMBRAL_LENTA_MS ?? 1000
@@ -12,6 +14,12 @@ interface Estadistica {
 }
 
 const porRuta = new Map<string, Estadistica>();
+const retardoBucle = monitorEventLoopDelay({resolution: 10});
+retardoBucle.enable();
+
+function nanosegundosAMilisegundosRedondeados(ns: number): number {
+    return Math.round(ns / 1e6);
+}
 
 export function medirLatencia(
     req: Request,
@@ -48,6 +56,16 @@ export function medirLatencia(
 export function resumenMetricas() {
     return {
         umbralLentaMs: UMBRAL_LENTA_MS,
+        nucleos: availableParallelism(),
+        bucle: {
+            p50Ms: nanosegundosAMilisegundosRedondeados(
+                retardoBucle.percentile(50)
+            ),
+            p99Ms: nanosegundosAMilisegundosRedondeados(
+                retardoBucle.percentile(99)
+            ),
+            maxMs: nanosegundosAMilisegundosRedondeados(retardoBucle.max)
+        },
         rutas: [...porRuta].map(([ruta, estadistica]) => ({
             ruta,
             peticiones: estadistica.peticiones,
